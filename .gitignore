@@ -1,3 +1,8 @@
+# Environment files
+.env
+.env.local
+.env.production
+
 # Frontend and client code
 frontend/
 
@@ -6,6 +11,11 @@ check-cosmos.js
 fix-throughput.js  
 reset-database.js
 test-api.js
+test-api.ps1
 
 # Dependencies
 node_modules/
+
+# Build outputs
+dist/
+build/
