@@ -5,6 +5,20 @@ import Joi from 'joi';
 
 const assignmentService = new AssignmentService();
 
+// AI Agent friendly validation schema for text-only assignment creation
+const createAssignmentSchema = Joi.object({
+  courseId: Joi.string().required(),
+  title: Joi.string().required().min(3).max(200),
+  description: Joi.string().required().min(10).max(2000),
+  instructions: Joi.string().optional().max(5000),
+  dueDate: Joi.date().required().greater('now'),
+  maxPoints: Joi.number().positive().required(),
+  assignmentType: Joi.string().valid('homework', 'quiz', 'exam', 'project', 'essay').required(),
+  isActive: Joi.boolean().default(true),
+  createdBy: Joi.string().required(),
+  submissionFormat: Joi.string().valid('text', 'file', 'both').required()
+});
+
 // AI Agent friendly validation schema for assignment creation with file attachments
 const createAssignmentWithFilesSchema = Joi.object({
   courseId: Joi.string().required(),
@@ -28,6 +42,63 @@ const createAssignmentWithFilesSchema = Joi.object({
 });
 
 export class AIAssignmentController {
+  
+  // POST /ai/assignments/create → AI Agent creates text-only assignment
+  async createAssignment(req: Request, res: Response) {
+    try {
+      console.log('🤖 AI Agent: Creating text-only assignment');
+      
+      // Validate request body
+      const { error, value } = createAssignmentSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          details: error.details
+        });
+      }
+
+      // Create assignment data (no attachments)
+      const assignmentData = {
+        courseId: value.courseId,
+        title: value.title,
+        description: value.description,
+        instructions: value.instructions,
+        dueDate: value.dueDate,
+        maxPoints: value.maxPoints,
+        assignmentType: value.assignmentType,
+        isActive: value.isActive,
+        createdBy: value.createdBy,
+        submissionFormat: value.submissionFormat
+      };
+
+      // Create the assignment using the service
+      const assignment = await assignmentService.createAssignment(assignmentData);
+      
+      console.log('✅ Text-only assignment created successfully:', assignment.id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Assignment created successfully',
+        data: assignment
+      });
+
+    } catch (error: any) {
+      console.error('❌ Error creating text-only assignment:', error);
+      
+      if (error.message === 'Course not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Course not found'
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
   
   // POST /ai/assignments/create-with-files → AI Agent creates assignment with file attachments
   async createAssignmentWithFiles(req: Request, res: Response) {

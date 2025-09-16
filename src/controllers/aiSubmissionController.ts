@@ -7,6 +7,15 @@ import Joi from 'joi';
 const submissionService = new SubmissionService();
 const assignmentService = new AssignmentService();
 
+// AI Agent friendly validation schema for text-only submission
+const createSubmissionSchema = Joi.object({
+  assignmentId: Joi.string().required(),
+  studentId: Joi.string().required(),
+  studentName: Joi.string().required().min(2).max(100),
+  studentEmail: Joi.string().email().required(),
+  submissionText: Joi.string().required().min(1).max(10000)
+});
+
 // AI Agent friendly validation schema for submission with file attachments
 const createSubmissionWithFilesSchema = Joi.object({
   assignmentId: Joi.string().required(),
@@ -30,7 +39,85 @@ const getSubmissionAttachmentSchema = Joi.object({
 });
 
 export class AISubmissionController {
-  
+
+  // POST /ai/submissions/create → AI Agent creates text-only submission
+  async createSubmission(req: Request, res: Response) {
+    try {
+      console.log('🤖 AI Agent: Creating text-only submission');
+      
+      // Validate request body
+      const { error, value } = createSubmissionSchema.validate(req.body);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          details: error.details
+        });
+      }
+
+      // Get assignment to validate submission format
+      const assignment = await assignmentService.getAssignmentById(value.assignmentId);
+      if (!assignment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Assignment not found'
+        });
+      }
+
+      // Validate submission format requirements
+      if (assignment.submissionFormat === 'file') {
+        return res.status(400).json({
+          success: false,
+          message: 'File submission is required for this assignment.'
+        });
+      }
+
+      // Create submission data (text-only)
+      const submissionData = {
+        assignmentId: value.assignmentId,
+        studentId: value.studentId,
+        studentName: value.studentName,
+        studentEmail: value.studentEmail,
+        submissionText: value.submissionText,
+        status: 'submitted' as const
+      };
+
+      // Create the submission using the service
+      const submission = await submissionService.createSubmission(submissionData);
+      
+      console.log('✅ Text-only submission created successfully:', submission.id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Submission created successfully',
+        data: {
+          submissionId: submission.id,
+          assignmentId: submission.assignmentId,
+          status: submission.status,
+          submittedAt: submission.submittedAt,
+          isLate: submission.isLate,
+          submissionNumber: submission.submissionNumber,
+          submissionText: submission.submissionText
+        }
+      });
+
+    } catch (error: any) {
+      console.error('❌ Error creating text-only submission:', error);
+      
+      if (error.message === 'Assignment not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Assignment not found'
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
   // POST /ai/submissions/create-with-files → AI Agent creates submission with file attachments
   async createSubmissionWithFiles(req: Request, res: Response) {
     try {

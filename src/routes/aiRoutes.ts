@@ -6,14 +6,20 @@ const router = Router();
 const aiAssignmentController = new AIAssignmentController();
 const aiSubmissionController = new AISubmissionController();
 
-// AI Agent-friendly assignment endpoints with file support
+// AI Agent-friendly assignment endpoints
+// POST /ai/assignments/create → Create text-only assignment (no attachments)
+router.post('/assignments/create', aiAssignmentController.createAssignment.bind(aiAssignmentController));
+
 // POST /ai/assignments/create-with-files → Create assignment with base64 encoded file attachments
 router.post('/assignments/create-with-files', aiAssignmentController.createAssignmentWithFiles.bind(aiAssignmentController));
 
 // POST /ai/assignments/get-download-url → Get secure download URL for assignment attachment
 router.post('/assignments/get-download-url', aiAssignmentController.getAssignmentAttachmentUrl.bind(aiAssignmentController));
 
-// AI Agent-friendly submission endpoints with file support
+// AI Agent-friendly submission endpoints
+// POST /ai/submissions/create → Create text-only submission (no attachments)
+router.post('/submissions/create', aiSubmissionController.createSubmission.bind(aiSubmissionController));
+
 // POST /ai/submissions/create-with-files → Create submission with base64 encoded file attachments
 router.post('/submissions/create-with-files', aiSubmissionController.createSubmissionWithFiles.bind(aiSubmissionController));
 
