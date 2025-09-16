@@ -49,6 +49,23 @@ export interface Student {
   profileImage?: string;
 }
 
+export interface Assignment {
+  id: string;
+  courseId: string;
+  title: string;
+  description: string;
+  instructions?: string;
+  dueDate: Date;
+  maxPoints: number;
+  assignmentType: 'homework' | 'quiz' | 'exam' | 'project' | 'essay';
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string; // instructor ID
+  attachments?: string[]; // file URLs or references
+  submissionFormat: 'text' | 'file' | 'both';
+}
+
 export interface User {
   id: string;
   email: string;

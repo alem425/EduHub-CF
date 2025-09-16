@@ -23,7 +23,8 @@
 1. **Courses**: Store course information with embedded student enrollment data
 2. **Enrollments**: Individual enrollment records (for detailed tracking)
 3. **Students**: Student profiles with their enrolled courses
-4. **Users**: User authentication and profile data
+4. **Assignments**: Course assignments with details and due dates
+5. **Users**: User authentication and profile data
 
 ### Course Data Structure:
 
@@ -281,15 +282,53 @@ IF testing write operations THEN create course after health check
 
 ```
 IF need to enroll student THEN:
-  1. Call GET /api/courses to verify course exists and has capacity
-  2. Check currentEnrollments < maxStudents
-  3. Call POST /api/courses/enroll with courseId in request body
+  1. Call GET /api/courses to get available courses and their IDs
+  2. Extract actual courseId from response (e.g., "course-456")
+  3. Check currentEnrollments < maxStudents for chosen course
+  4. Call POST /api/courses/enroll with real courseId in request body
 
 IF testing enrollment limits THEN:
-  1. Create course with low maxStudents
-  2. Enroll students until capacity reached
-  3. Test enrollment rejection
+  1. Create course with low maxStudents, save returned courseId
+  2. Use saved courseId to enroll students until capacity reached
+  3. Test enrollment rejection with same courseId
 ```
+
+#### ⚠️ CRITICAL: Dynamic Course ID Workflow
+
+**DO NOT use placeholder values like "course-123" in actual requests!**
+
+**Step-by-Step Process:**
+
+1. **Get Available Courses:**
+
+   ```
+   GET /api/courses
+   ```
+
+2. **Extract Real Course ID from Response:**
+
+   ```json
+   {
+     "data": [
+       {
+         "id": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",  ← USE THIS REAL ID
+         "title": "Advanced React Development",
+         "currentEnrollments": 2,
+         "maxStudents": 25
+       }
+     ]
+   }
+   ```
+
+3. **Use Real Course ID in Enrollment:**
+   ```json
+   {
+     "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",  ← ACTUAL ID FROM STEP 2
+     "studentId": "student-789",
+     "studentName": "Alex Chen",
+     "studentEmail": "alex@example.com"
+   }
+   ```
 
 #### Required Parameters Schema:
 
@@ -299,7 +338,7 @@ IF testing enrollment limits THEN:
   "properties": {
     "courseId": {
       "type": "string",
-      "description": "Unique identifier of the course to enroll the student in. Obtain this from the course creation response or GET /api/courses endpoint."
+      "description": "REAL course identifier extracted from GET /api/courses response. This must be an actual UUID-like string (e.g., 'b0ef093e-4dbf-4bf3-be66-4e7f6294266a'), NOT a placeholder like 'course-123'. First call GET /api/courses, find the course you want, then use its 'id' field value here."
     },
     "studentId": {
       "type": "string",
@@ -322,11 +361,47 @@ IF testing enrollment limits THEN:
 
 ```json
 {
-  "courseId": "course-456",
+  "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
   "studentId": "student-789",
   "studentName": "Alex Chen",
   "studentEmail": "alex.chen@email.com"
 }
+```
+
+**⚠️ Important:** The `courseId` above is a real example from our test. Your AI agent must replace this with an actual course ID from your GET /api/courses call!
+
+#### Complete AI Agent Workflow Example:
+
+```javascript
+// Step 1: Get available courses
+const coursesResponse = await fetch("/api/courses");
+const coursesData = await coursesResponse.json();
+
+// Step 2: Find a course with available capacity
+const availableCourse = coursesData.data.find(
+  (course) => course.currentEnrollments < course.maxStudents
+);
+
+if (!availableCourse) {
+  throw new Error("No courses with available capacity");
+}
+
+// Step 3: Extract the real course ID
+const realCourseId = availableCourse.id; // e.g., "b0ef093e-4dbf-4bf3-be66-4e7f6294266a"
+
+// Step 4: Enroll student using the real course ID
+const enrollmentData = {
+  courseId: realCourseId, // ← REAL ID from step 3
+  studentId: "unique-student-123",
+  studentName: "John Doe",
+  studentEmail: "john@example.com",
+};
+
+const enrollmentResponse = await fetch("/api/courses/enroll", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(enrollmentData),
+});
 ```
 
 #### Expected Response:
@@ -397,8 +472,10 @@ IF course management task THEN use to see enrolled students
 #### Example URL:
 
 ```
-https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/courses/students?courseId=course-456
+https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/courses/students?courseId=b0ef093e-4dbf-4bf3-be66-4e7f6294266a
 ```
+
+**⚠️ Important:** Replace `b0ef093e-4dbf-4bf3-be66-4e7f6294266a` with a real course ID from your GET /api/courses response!
 
 #### Expected Response:
 
@@ -520,8 +597,10 @@ IF student profile lookup THEN use this endpoint
 #### Example URL:
 
 ```
-https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/students/profile?studentId=student-789
+https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/students/profile?studentId=ai-test-student-001
 ```
+
+**⚠️ Important:** Replace `ai-test-student-001` with a real student ID from your enrollment operations!
 
 #### Expected Response:
 
@@ -537,6 +616,292 @@ https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/
     "updatedAt": "2025-09-16T04:20:00.000Z",
     "isActive": true
   }
+}
+```
+
+---
+
+## Assignment Endpoints
+
+### 8. Get Course Assignments Endpoint (AI Agent Optimized)
+
+**URL**: `/api/assignments/course?courseId={courseId}`  
+**Method**: GET  
+**Purpose**: Get all assignments for a specific course
+
+#### When to Use:
+
+- ✅ **After getting course ID** to see course assignments
+- ✅ Viewing course assignment lists
+- ✅ Assignment management for courses
+- ✅ **Preferred for AI agents** - uses query parameter instead of URL path
+
+#### Query Parameter Setup:
+
+- **Parameter Type**: `Url` (query parameter)
+- **Parameter Name**: `courseId`
+- **Parameter Value**: Use actual course ID (e.g., `course-456`)
+
+#### Parameter Schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "courseId": {
+      "type": "string",
+      "description": "REAL course identifier extracted from GET /api/courses response. This must be an actual UUID-like string, NOT a placeholder. First call GET /api/courses, find the course you want, then use its 'id' field value here as a query parameter."
+    }
+  },
+  "required": ["courseId"]
+}
+```
+
+#### Example URL:
+
+```
+https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/assignments/course?courseId=b0ef093e-4dbf-4bf3-be66-4e7f6294266a
+```
+
+#### Expected Response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "assignment-123",
+      "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
+      "title": "JavaScript Fundamentals Quiz",
+      "description": "Test your understanding of JavaScript basics",
+      "dueDate": "2025-09-30T23:59:59.000Z",
+      "maxPoints": 100,
+      "assignmentType": "quiz",
+      "createdBy": "instructor-456",
+      "submissionFormat": "text",
+      "isActive": true,
+      "createdAt": "2025-09-16T10:00:00.000Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+---
+
+### 9. Create Assignment Endpoint (AI Agent Optimized)
+
+**URL**: `/api/assignments/create`  
+**Method**: POST  
+**Purpose**: Create a new assignment for a course
+
+#### When to Use:
+
+- ✅ **After getting course ID** to create assignments for that course
+- ✅ Teacher/instructor assignment creation
+- ✅ Setting up course content
+- ✅ **Preferred for AI agents** - no URL parameters needed
+
+#### Required Parameters Schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "courseId": {
+      "type": "string",
+      "description": "REAL course identifier extracted from GET /api/courses response. This must be an actual UUID-like string, NOT a placeholder like 'course-123'."
+    },
+    "title": {
+      "type": "string",
+      "description": "Assignment title (3-200 characters). Should be descriptive and clear."
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed assignment description (10-2000 characters). Explain what students need to do."
+    },
+    "instructions": {
+      "type": "string",
+      "description": "Optional detailed instructions (max 5000 characters). Step-by-step guidance for students."
+    },
+    "dueDate": {
+      "type": "string",
+      "description": "Assignment due date in ISO format (e.g., '2025-09-30T23:59:59.000Z'). Must be in the future."
+    },
+    "maxPoints": {
+      "type": "number",
+      "description": "Maximum points possible for this assignment. Must be a positive number."
+    },
+    "assignmentType": {
+      "type": "string",
+      "description": "Type of assignment. Must be exactly: 'homework', 'quiz', 'exam', 'project', or 'essay'."
+    },
+    "createdBy": {
+      "type": "string",
+      "description": "Instructor ID who is creating the assignment. Use a unique instructor identifier."
+    },
+    "submissionFormat": {
+      "type": "string",
+      "description": "How students should submit. Must be exactly: 'text', 'file', or 'both'."
+    },
+    "isActive": {
+      "type": "boolean",
+      "description": "Whether assignment is active. Optional, defaults to true."
+    },
+    "attachments": {
+      "type": "array",
+      "description": "Optional array of attachment URLs or file references."
+    }
+  },
+  "required": [
+    "courseId",
+    "title",
+    "description",
+    "dueDate",
+    "maxPoints",
+    "assignmentType",
+    "createdBy",
+    "submissionFormat"
+  ]
+}
+```
+
+#### Example Request:
+
+```json
+{
+  "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
+  "title": "JavaScript Fundamentals Quiz",
+  "description": "Test your understanding of JavaScript basics including variables, functions, and control structures",
+  "instructions": "Answer all questions. You have 60 minutes to complete this quiz.",
+  "dueDate": "2025-09-30T23:59:59.000Z",
+  "maxPoints": 100,
+  "assignmentType": "quiz",
+  "createdBy": "instructor-456",
+  "submissionFormat": "text"
+}
+```
+
+#### Expected Response:
+
+```json
+{
+  "success": true,
+  "message": "Assignment created successfully",
+  "data": {
+    "id": "assignment-789",
+    "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
+    "title": "JavaScript Fundamentals Quiz",
+    "maxPoints": 100,
+    "assignmentType": "quiz",
+    "createdAt": "2025-09-16T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 10. Get Assignment Details Endpoint (AI Agent Optimized)
+
+**URL**: `/api/assignments/details?assignmentId={assignmentId}`  
+**Method**: GET  
+**Purpose**: Get detailed information about a specific assignment
+
+#### When to Use:
+
+- ✅ **After getting assignment ID** from course assignments list
+- ✅ Viewing detailed assignment information
+- ✅ Assignment management and editing
+- ✅ **Preferred for AI agents** - uses query parameter instead of URL path
+
+#### Query Parameter Setup:
+
+- **Parameter Type**: `Url` (query parameter)
+- **Parameter Name**: `assignmentId`
+- **Parameter Value**: Use actual assignment ID from previous calls
+
+#### Parameter Schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "assignmentId": {
+      "type": "string",
+      "description": "Unique identifier of the assignment to retrieve. This should be an actual assignment ID obtained from the GET /api/assignments/course response or assignment creation response."
+    }
+  },
+  "required": ["assignmentId"]
+}
+```
+
+#### Example URL:
+
+```
+https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/api/assignments/details?assignmentId=assignment-789
+```
+
+#### Expected Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "assignment-789",
+    "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
+    "title": "JavaScript Fundamentals Quiz",
+    "description": "Test your understanding of JavaScript basics including variables, functions, and control structures",
+    "instructions": "Answer all questions. You have 60 minutes to complete this quiz.",
+    "dueDate": "2025-09-30T23:59:59.000Z",
+    "maxPoints": 100,
+    "assignmentType": "quiz",
+    "createdBy": "instructor-456",
+    "submissionFormat": "text",
+    "isActive": true,
+    "createdAt": "2025-09-16T10:00:00.000Z",
+    "updatedAt": "2025-09-16T10:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 11. Get All Assignments Endpoint
+
+**URL**: `/api/assignments`  
+**Method**: GET  
+**Purpose**: Retrieve all assignments across all courses
+
+#### When to Use:
+
+- ✅ **After assignment operations** to verify assignments were created
+- ✅ Assignment management and overview
+- ✅ System-wide assignment reporting
+- ✅ Cross-course assignment analysis
+
+#### No Parameters Required:
+
+```json
+{}
+```
+
+#### Expected Response:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "assignment-789",
+      "courseId": "b0ef093e-4dbf-4bf3-be66-4e7f6294266a",
+      "title": "JavaScript Fundamentals Quiz",
+      "assignmentType": "quiz",
+      "dueDate": "2025-09-30T23:59:59.000Z",
+      "maxPoints": 100,
+      "createdAt": "2025-09-16T10:00:00.000Z"
+    }
+  ],
+  "count": 1
 }
 ```
 
@@ -580,6 +945,16 @@ https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/
 4. For each course: GET /api/courses/students?courseId=X (verify enrollments)
 ```
 
+### **Assignment Management Workflow:**
+
+```
+1. GET /health (verify service)
+2. GET /api/courses (get course ID for assignment creation)
+3. POST /api/assignments/create (create assignment for course)
+4. GET /api/assignments/course?courseId=X (verify assignment created)
+5. GET /api/assignments/details?assignmentId=X (view assignment details)
+```
+
 ### **Testing Database Operations:**
 
 ```
@@ -587,7 +962,8 @@ https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net/
 2. GET /api/courses (test read operations)
 3. POST /api/courses (test write operations)
 4. POST /api/courses/enroll (test complex operations)
-5. GET /api/students (verify cross-collection updates)
+5. POST /api/assignments/create (test assignment operations)
+6. GET /api/students (verify cross-collection updates)
 ```
 
 ---
@@ -646,6 +1022,13 @@ POST /api/courses/enroll → GET /api/courses/students?courseId=X →
 GET /api/students
 ```
 
+#### **Assignment Creation Test:**
+
+```
+GET /health → GET /api/courses → POST /api/assignments/create →
+GET /api/assignments/course?courseId=X → GET /api/assignments
+```
+
 #### **Data Verification:**
 
 ```
@@ -662,24 +1045,30 @@ GET /api/students/profile?studentId=X → GET /api/courses/students?courseId=X
 ✅ `/health`  
 ✅ `/api/courses`  
 ✅ `/api/students`  
-✅ `/api/courses/enroll`
+✅ `/api/assignments`  
+✅ `/api/courses/enroll`  
+✅ `/api/assignments/create`
 
 ### **Query Parameter URLs:**
 
 ✅ `/api/courses/students?courseId=COURSE_ID`  
-✅ `/api/students/profile?studentId=STUDENT_ID`
+✅ `/api/students/profile?studentId=STUDENT_ID`  
+✅ `/api/assignments/course?courseId=COURSE_ID`  
+✅ `/api/assignments/details?assignmentId=ASSIGNMENT_ID`
 
 ### **Parameter Types for AI Agents:**
 
-- **No Parameters**: Health check, get all courses, get all students
-- **Request Body**: Course creation, student enrollment
-- **Query Parameters**: Get course students, get student by ID
+- **No Parameters**: Health check, get all courses, get all students, get all assignments
+- **Request Body**: Course creation, student enrollment, assignment creation
+- **Query Parameters**: Get course students, get student by ID, get course assignments, get assignment details
 
 ### **Common Parameter Values:**
 
-- **Course IDs**: `course-123`, `course-456` (from course creation responses)
+- **Course IDs**: `b0ef093e-4dbf-4bf3-be66-4e7f6294266a` (from course creation responses)
 - **Student IDs**: `student-001`, `student-789` (unique identifiers you create)
+- **Assignment IDs**: `assignment-789` (from assignment creation responses)
 - **Emails**: Must be valid format (e.g., `student@example.com`)
+- **Dates**: ISO format (e.g., `2025-09-30T23:59:59.000Z`)
 
 ---
 
