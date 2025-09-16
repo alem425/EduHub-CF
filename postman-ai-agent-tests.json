@@ -1,0 +1,127 @@
+{
+  "info": {
+    "name": "EDU Platform - AI Agent File Upload Tests",
+    "description": "Test file uploads for AI agents using JSON with base64 encoded files"
+  },
+  "baseUrl": "https://eduhub-platform-api-e6dyfphzcbawa9ge.canadacentral-01.azurewebsites.net",
+  "tests": [
+    {
+      "name": "1. Create Assignment with Files (AI Agent)",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/ai/assignments/create-with-files",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "courseId": "bd046644-b94c-4b9d-b2e1-b3507480baac",
+        "title": "AI Agent Assignment with Files",
+        "description": "Testing AI agent file upload functionality",
+        "instructions": "Complete the programming exercise and submit your solution.",
+        "dueDate": "2024-12-31T23:59:59Z",
+        "maxPoints": 100,
+        "assignmentType": "homework",
+        "submissionFormat": "both",
+        "createdBy": "ai-agent-test",
+        "attachments": [
+          {
+            "filename": "assignment-instructions.txt",
+            "mimeType": "text/plain",
+            "data": "VGhpcyBpcyBhIHRlc3QgZmlsZSBmb3IgQUkgYWdlbnQgdXBsb2FkLgoKQXNzaWdubWVudCBJbnN0cnVjdGlvbnM6CjEuIEltcGxlbWVudCBhIGZpYm9uYWNjaSBmdW5jdGlvbgo2LiBJbmNsdWRlIHRlc3QgY2FzZXMKMy4gRG9jdW1lbnQgeW91ciBjb2RlCgo="
+          },
+          {
+            "filename": "starter-code.js",
+            "mimeType": "text/javascript",
+            "data": "Ly8gU3RhcnRlciBjb2RlIGZvciBmaWJvbmFjY2kgYXNzaWdubWVudApmdW5jdGlvbiBmaWJvbmFjY2kobikgewogICAgLy8gVE9ETzogSW1wbGVtZW50IHlvdXIgc29sdXRpb24gaGVyZQogICAgcmV0dXJuIDA7Cn0KCi8vIFRlc3QgY2FzZXMKY29uc29sZS5sb2coZmlib25hY2NpKDApKTsgLy8gU2hvdWxkIHJldHVybiAwCmNvbnNvbGUubG9nKGZpYm9uYWNjaSgxKSk7IC8vIFNob3VsZCByZXR1cm4gMQ=="
+          }
+        ]
+      },
+      "expectedResponse": {
+        "success": true,
+        "message": "Assignment created successfully with attachments",
+        "data": {
+          "id": "assignment-id-here",
+          "title": "AI Agent Assignment with Files",
+          "attachments": ["blob-url-1", "blob-url-2"]
+        },
+        "attachmentsUploaded": 2
+      }
+    },
+    {
+      "name": "2. Create Submission with Files (AI Agent)", 
+      "method": "POST",
+      "url": "{{baseUrl}}/api/ai/submissions/create-with-files",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "assignmentId": "YOUR_ASSIGNMENT_ID_HERE",
+        "studentId": "ai-test-student-123",
+        "studentName": "AI Test Student",
+        "studentEmail": "ai.student@test.edu",
+        "submissionText": "Here is my solution to the fibonacci assignment implemented by AI agent.",
+        "attachments": [
+          {
+            "filename": "fibonacci-solution.js",
+            "mimeType": "text/javascript", 
+            "data": "ZnVuY3Rpb24gZmlib25hY2NpKG4pIHsKICAgIGlmIChuIDw9IDEpIHJldHVybiBuOwogICAgcmV0dXJuIGZpYm9uYWNjaShuIC0gMSkgKyBmaWJvbmFjY2kobiAtIDIpOwp9CgovLyBUZXN0IGNhc2VzCmZvciAobGV0IGkgPSAwOyBpIDwgMTA7IGkrKykgewogICAgY29uc29sZS5sb2coYEYoJHtpfSkgPSAke2ZpYm9uYWNjaShpKX1gKTsKfQ=="
+          },
+          {
+            "filename": "test-results.txt", 
+            "mimeType": "text/plain",
+            "data": "VGVzdCBSZXN1bHRzOgpGKDApID0gMApeKDEpID0gMQpeKDIpID0gMQpeKDMpID0gMgpeKDQpID0gMwpeKDUpID0gNQpGKDYpID0gOApeKDcpID0gMTMKRig4KSA9IDIxCkYoOSkgPSAzNAoKQWxsIHRlc3RzIHBhc3NlZCE="
+          }
+        ]
+      },
+      "expectedResponse": {
+        "success": true,
+        "message": "Submission created successfully with attachments",
+        "data": {
+          "submissionId": "submission-id-here",
+          "assignmentId": "assignment-id",
+          "status": "submitted",
+          "attachmentsUploaded": 2
+        }
+      }
+    },
+    {
+      "name": "3. Get Assignment Attachment Download URL",
+      "method": "POST", 
+      "url": "{{baseUrl}}/api/ai/assignments/get-download-url",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "assignmentId": "YOUR_ASSIGNMENT_ID_HERE",
+        "filename": "assignment-instructions.txt"
+      },
+      "expectedResponse": {
+        "success": true,
+        "data": {
+          "downloadUrl": "https://storage-url-with-sas-token",
+          "filename": "assignment-instructions.txt",
+          "expiresInMinutes": 60
+        }
+      }
+    },
+    {
+      "name": "4. Get Submission Attachment Download URL",
+      "method": "POST",
+      "url": "{{baseUrl}}/api/ai/submissions/get-download-url", 
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "submissionId": "YOUR_SUBMISSION_ID_HERE",
+        "filename": "fibonacci-solution.js"
+      },
+      "expectedResponse": {
+        "success": true,
+        "data": {
+          "downloadUrl": "https://storage-url-with-sas-token",
+          "filename": "fibonacci-solution.js",
+          "expiresInMinutes": 60
+        }
+      }
+    }
+  ]
+}

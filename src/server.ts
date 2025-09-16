@@ -8,6 +8,7 @@ import courseRoutes from './routes/courseRoutes';
 import studentRoutes from './routes/studentRoutes';
 import assignmentRoutes from './routes/assignmentRoutes';
 import submissionRoutes from './routes/submissionRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api', submissionRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
