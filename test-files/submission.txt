@@ -1,0 +1,10 @@
+This is a test submission.
+
+Student: John Doe
+Course: Computer Science 101
+Assignment: Programming Exercise 1
+
+My solution includes:
+1. Algorithm implementation
+2. Test cases
+3. Documentation

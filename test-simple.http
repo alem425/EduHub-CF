@@ -1,0 +1,59 @@
+# Simple HTTP tests for file uploads
+# Use with REST Client extension in VS Code or similar tools
+
+### Variables
+@baseUrl = http://localhost:3001
+# For deployed version, use: @baseUrl = https://your-app.azurewebsites.net
+@courseId = test-course-123
+@studentId = test-student-789
+@teacherId = test-teacher-101
+
+### Test 1: Create Assignment with Text Only (No Files)
+POST {{baseUrl}}/api/courses/{{courseId}}/assignments
+Content-Type: application/json
+
+{
+  "title": "Simple Text Assignment",
+  "description": "This is a test assignment without files",
+  "instructions": "Please submit your answer in text format",
+  "dueDate": "2024-12-31T23:59:59Z",
+  "maxPoints": 50,
+  "assignmentType": "homework",
+  "submissionFormat": "text",
+  "createdBy": "{{teacherId}}"
+}
+
+### Test 2: Submit Assignment with Text Only
+POST {{baseUrl}}/api/assignments/YOUR_ASSIGNMENT_ID_HERE/submit
+Content-Type: application/json
+
+{
+  "studentId": "{{studentId}}",
+  "studentName": "John Doe",
+  "studentEmail": "john.doe@student.edu",
+  "submissionText": "This is my text submission for the assignment. I have completed all the required tasks and provided detailed explanations for each step."
+}
+
+### Test 3: Get Assignment Details
+GET {{baseUrl}}/api/assignments/YOUR_ASSIGNMENT_ID_HERE
+
+### Test 4: Get All Assignments
+GET {{baseUrl}}/api/assignments/
+
+### Test 5: Get Course Assignments
+GET {{baseUrl}}/api/courses/{{courseId}}/assignments
+
+### Test 6: Health Check
+GET {{baseUrl}}/health
+
+### Test 7: Get Assignment Submissions (Replace with actual assignment ID)
+GET {{baseUrl}}/api/assignments/YOUR_ASSIGNMENT_ID_HERE/submissions
+
+### Test 8: Get Submission Details (Replace with actual submission ID)
+GET {{baseUrl}}/api/submissions/YOUR_SUBMISSION_ID_HERE
+
+### Test 9: Download Assignment Attachment (Replace with actual IDs and filename)
+GET {{baseUrl}}/api/assignments/YOUR_ASSIGNMENT_ID_HERE/attachments/YOUR_FILENAME_HERE/download
+
+### Test 10: Download Submission Attachment (Replace with actual IDs and filename)
+GET {{baseUrl}}/api/submissions/YOUR_SUBMISSION_ID_HERE/attachments/YOUR_FILENAME_HERE/download
