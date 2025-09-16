@@ -191,4 +191,112 @@ export class CourseController {
       });
     }
   }
+
+  // AI Agent-friendly alternatives using query parameters
+
+  // GET /courses/students?courseId=123 → List enrolled students (AI Agent friendly)
+  async getEnrolledStudentsByQuery(req: Request, res: Response) {
+    try {
+      const { courseId } = req.query;
+      
+      if (!courseId || typeof courseId !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'courseId query parameter is required'
+        });
+      }
+      
+      const enrolledStudents = await courseService.getEnrolledStudents(courseId);
+      
+      res.json({
+        success: true,
+        data: enrolledStudents,
+        count: enrolledStudents.length
+      });
+    } catch (error) {
+      console.error('Error in getEnrolledStudentsByQuery:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // POST /courses/enroll → Student enrolls in a course (AI Agent friendly)
+  async enrollInCourseByQuery(req: Request, res: Response) {
+    try {
+      const { courseId, studentId, studentName, studentEmail } = req.body;
+      
+      // Validate required fields
+      if (!courseId || !studentId || !studentName || !studentEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'courseId, studentId, studentName, and studentEmail are required in request body'
+        });
+      }
+
+      const enrollment = await courseService.enrollStudent(courseId, studentId, studentName, studentEmail);
+      
+      res.status(201).json({
+        success: true,
+        message: 'Successfully enrolled in course',
+        data: enrollment
+      });
+    } catch (error: any) {
+      console.error('Error in enrollInCourseByQuery:', error);
+      
+      if (error.message === 'Course not found') {
+        return res.status(404).json({
+          success: false,
+          message: 'Course not found'
+        });
+      }
+      
+      if (error.message === 'Course is full' || error.message === 'Student already enrolled in this course') {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // GET /students/profile?studentId=123 → Get student by ID (AI Agent friendly)
+  async getStudentByIdQuery(req: Request, res: Response) {
+    try {
+      const { studentId } = req.query;
+      
+      if (!studentId || typeof studentId !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: 'studentId query parameter is required'
+        });
+      }
+      
+      const student = await courseService.getStudentById(studentId);
+      
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: 'Student not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: student
+      });
+    } catch (error) {
+      console.error('Error in getStudentByIdQuery:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }
