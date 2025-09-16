@@ -51,7 +51,14 @@ export class AssignmentController {
       const { id: courseId } = req.params;
       
       // Handle file uploads if any
+      console.log('🔍 DEBUG: Checking for uploaded files...');
+      console.log('🔍 DEBUG: req.file:', req.file ? 'exists' : 'none');
+      console.log('🔍 DEBUG: req.files:', req.files ? Object.keys(req.files) : 'none');
+      console.log('🔍 DEBUG: Content-Type:', req.headers['content-type']);
+      
       const uploadedFiles = getUploadedFiles(req);
+      console.log('🔍 DEBUG: uploadedFiles count:', uploadedFiles.length);
+      
       let attachments: string[] = [];
 
       if (uploadedFiles.length > 0) {
@@ -203,8 +210,53 @@ export class AssignmentController {
   // POST /assignments/create → Create assignment (AI Agent friendly)
   async createAssignmentByBody(req: Request, res: Response) {
     try {
+      // DEBUG: Log incoming request details
+      console.log('🔍 DEBUG: createAssignmentByBody called');
+      console.log('🔍 DEBUG: Content-Type:', req.headers['content-type']);
+      console.log('🔍 DEBUG: req.file:', req.file ? 'exists' : 'none');
+      console.log('🔍 DEBUG: req.files:', req.files ? Object.keys(req.files) : 'none');
+      console.log('🔍 DEBUG: Body keys:', Object.keys(req.body));
+      
+      const uploadedFiles = getUploadedFiles(req);
+      console.log('🔍 DEBUG: uploadedFiles count:', uploadedFiles.length);
+      
+      let attachments: string[] = [];
+
+      if (uploadedFiles.length > 0) {
+        try {
+          console.log(`📎 Processing ${uploadedFiles.length} attachment(s) for assignment...`);
+          
+          // Generate folder path for assignment attachments
+          const tempAssignmentId = 'temp-' + Date.now();
+          const folderPath = BlobStorageService.generateFolderPath('assignment', req.body.courseId, tempAssignmentId);
+          
+          // Upload files to blob storage
+          const uploadResults = await blobStorageService.uploadFiles(uploadedFiles, folderPath);
+          
+          // Store the blob URLs as attachments
+          attachments = uploadResults.map(result => result.uploadUrl);
+          
+          console.log(`✅ Uploaded ${uploadResults.length} attachment(s) for assignment`);
+        } catch (uploadError) {
+          console.error('Error uploading assignment attachments:', uploadError);
+          return res.status(400).json({
+            success: false,
+            message: 'Failed to upload attachments',
+            error: uploadError instanceof Error ? uploadError.message : 'Unknown upload error'
+          });
+        }
+      } else {
+        console.log('ℹ️ No files uploaded for this assignment');
+      }
+      
+      // Add attachments to request body for validation
+      const assignmentData = { 
+        ...req.body,
+        attachments: attachments.length > 0 ? attachments : undefined
+      };
+      
       // Validate request body
-      const { error, value } = createAssignmentSchema.validate(req.body);
+      const { error, value } = createAssignmentSchema.validate(assignmentData);
       if (error) {
         return res.status(400).json({
           success: false,
