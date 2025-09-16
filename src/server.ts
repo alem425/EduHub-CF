@@ -57,7 +57,16 @@ app.use((req, res) => {
 // Initialize database and start server
 async function startServer() {
   try {
+    console.log('🔧 Starting server initialization...');
+    console.log('📍 PORT:', PORT);
+    console.log('🌍 NODE_ENV:', process.env.NODE_ENV);
+    console.log('🔗 COSMOS_DB_ENDPOINT:', process.env.COSMOS_DB_ENDPOINT ? 'SET' : 'NOT SET');
+    console.log('🔑 COSMOS_DB_KEY:', process.env.COSMOS_DB_KEY ? 'SET' : 'NOT SET');
+    console.log('🗃️  COSMOS_DB_DATABASE_ID:', process.env.COSMOS_DB_DATABASE_ID);
+    
+    console.log('📡 Initializing Cosmos DB connection...');
     await cosmosClient.initialize();
+    console.log('✅ Cosmos DB initialized successfully');
     
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -65,7 +74,8 @@ async function startServer() {
       console.log(`📚 Courses API: http://localhost:${PORT}/api/courses`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error);
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
     process.exit(1);
   }
 }
