@@ -8,12 +8,19 @@ export class AssignmentService {
 
   async getCourseAssignments(courseId: string): Promise<Assignment[]> {
     try {
+      console.log(`🔍 Looking for assignments for course ID: ${courseId}`);
+      
       const querySpec = {
         query: 'SELECT * FROM c WHERE c.courseId = @courseId AND c.isActive = true ORDER BY c.dueDate ASC',
         parameters: [{ name: '@courseId', value: courseId }]
       };
       
+      console.log(`🔍 Query: ${querySpec.query} with courseId = ${courseId}`);
+      
       const { resources } = await this.assignmentsContainer.items.query(querySpec).fetchAll();
+      
+      console.log(`🔍 Query returned ${resources.length} assignments for course`);
+      
       return resources;
     } catch (error) {
       console.error('Error fetching course assignments:', error);
@@ -23,13 +30,23 @@ export class AssignmentService {
 
   async getAssignmentById(assignmentId: string): Promise<Assignment | null> {
     try {
-      // We need to query by assignment ID since we're using courseId as partition key
+      console.log(`🔍 Looking for assignment ID: ${assignmentId}`);
+      
+      // We need to query across partitions since we don't know the courseId
       const querySpec = {
         query: 'SELECT * FROM c WHERE c.id = @assignmentId',
         parameters: [{ name: '@assignmentId', value: assignmentId }]
       };
       
+      console.log(`🔍 Query: ${querySpec.query} with assignmentId = ${assignmentId}`);
+      
       const { resources } = await this.assignmentsContainer.items.query(querySpec).fetchAll();
+      
+      console.log(`🔍 Query returned ${resources.length} results`);
+      if (resources.length > 0) {
+        console.log(`🔍 Found assignment: ${resources[0].title}`);
+      }
+      
       return resources.length > 0 ? resources[0] : null;
     } catch (error) {
       console.error('Error fetching assignment:', error);
