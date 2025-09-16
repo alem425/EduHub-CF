@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { CourseController } from '../controllers/courseController';
 import { AssignmentController } from '../controllers/assignmentController';
+import { uploadMultiple } from '../middleware/uploadMiddleware';
 
 const router = Router();
 const courseController = new CourseController();
@@ -29,7 +30,7 @@ router.post('/enroll', courseController.enrollInCourseByQuery.bind(courseControl
 // GET /courses/{id}/assignments → Get assignments for a course
 router.get('/:id/assignments', assignmentController.getCourseAssignments.bind(assignmentController));
 
-// POST /courses/{id}/assignments → Create assignment (teacher-only)
-router.post('/:id/assignments', assignmentController.createCourseAssignment.bind(assignmentController));
+// POST /courses/{id}/assignments → Create assignment (teacher-only) - with file upload support
+router.post('/:id/assignments', uploadMultiple('attachments', 5), assignmentController.createCourseAssignment.bind(assignmentController));
 
 export default router;

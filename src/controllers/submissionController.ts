@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { SubmissionService } from '../services/submissionService';
 import { AssignmentService } from '../services/assignmentService';
+import { blobStorageService, BlobStorageService } from '../services/blobStorageService';
+import { getUploadedFiles, validateFileRequirements } from '../middleware/uploadMiddleware';
 import Joi from 'joi';
 
 const submissionService = new SubmissionService();
@@ -38,17 +40,7 @@ export class SubmissionController {
     try {
       const { id: assignmentId } = req.params;
       
-      // Validate request body
-      const { error, value } = createSubmissionSchema.validate(req.body);
-      if (error) {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation error',
-          details: error.details
-        });
-      }
-
-      // Verify assignment exists
+      // Verify assignment exists first
       const assignment = await assignmentService.getAssignmentById(assignmentId);
       if (!assignment) {
         return res.status(404).json({
@@ -57,8 +49,84 @@ export class SubmissionController {
         });
       }
 
-      // Create submission
+      // Validate submission format requirements
+      const formatValidation = validateFileRequirements(req, assignment.submissionFormat);
+      if (!formatValidation.isValid) {
+        return res.status(400).json({
+          success: false,
+          message: formatValidation.error
+        });
+      }
+
+      // Handle file uploads if any
+      const uploadedFiles = getUploadedFiles(req);
+      let attachments: any[] = [];
+
+      if (uploadedFiles.length > 0) {
+        try {
+          console.log(`📎 Processing ${uploadedFiles.length} attachment(s) for submission...`);
+          
+          // Generate temporary submission ID for folder structure
+          const tempSubmissionId = 'temp-' + Date.now();
+          const folderPath = BlobStorageService.generateFolderPath('submission', assignment.courseId, tempSubmissionId);
+          
+          // Upload files to blob storage
+          const uploadResults = await blobStorageService.uploadFiles(uploadedFiles, folderPath);
+          
+          // Convert upload results to SubmissionAttachment format
+          attachments = uploadResults.map(result => ({
+            id: result.id,
+            filename: result.filename,
+            originalFilename: result.originalFilename,
+            fileSize: result.fileSize,
+            mimeType: result.mimeType,
+            uploadUrl: result.uploadUrl,
+            uploadedAt: result.uploadedAt
+          }));
+          
+          console.log(`✅ Uploaded ${uploadResults.length} attachment(s) for submission`);
+        } catch (uploadError) {
+          console.error('Error uploading submission attachments:', uploadError);
+          return res.status(400).json({
+            success: false,
+            message: 'Failed to upload attachments',
+            error: uploadError instanceof Error ? uploadError.message : 'Unknown upload error'
+          });
+        }
+      }
+
+      // Prepare submission data with uploaded attachments
       const submissionData = {
+        ...req.body,
+        attachments: attachments.length > 0 ? attachments : undefined
+      };
+      
+      // Validate request body with attachments
+      const { error, value } = createSubmissionSchema.validate(submissionData);
+      if (error) {
+        // If validation fails and we uploaded files, clean them up
+        if (attachments.length > 0) {
+          try {
+            const blobNames = attachments.map((attachment: any) => {
+              const urlParts = attachment.uploadUrl.split('/');
+              return urlParts.slice(-4).join('/'); // Get the blob name from URL
+            });
+            await blobStorageService.deleteFiles(blobNames);
+            console.log('🗑️ Cleaned up uploaded files due to validation error');
+          } catch (cleanupError) {
+            console.error('Error cleaning up files:', cleanupError);
+          }
+        }
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          details: error.details
+        });
+      }
+
+      // Create submission with final data
+      const finalSubmissionData = {
         assignmentId,
         studentId: value.studentId,
         studentName: value.studentName,
@@ -67,7 +135,7 @@ export class SubmissionController {
         attachments: value.attachments
       };
 
-      const submission = await submissionService.createSubmission(submissionData);
+      const submission = await submissionService.createSubmission(finalSubmissionData);
       
       res.status(201).json({
         success: true,
@@ -78,7 +146,8 @@ export class SubmissionController {
           status: submission.status,
           submittedAt: submission.submittedAt,
           isLate: submission.isLate,
-          submissionNumber: submission.submissionNumber
+          submissionNumber: submission.submissionNumber,
+          attachmentsUploaded: attachments.length
         }
       });
 
@@ -433,6 +502,74 @@ export class SubmissionController {
         });
       }
       
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // GET /submissions/{id}/attachments/{filename}/download → Generate secure download URL for submission attachment
+  async getSubmissionAttachmentDownloadUrl(req: Request, res: Response) {
+    try {
+      const { id: submissionId, filename } = req.params;
+      
+      // TODO: Add authentication middleware to verify user has access to this submission
+      
+      // Verify submission exists
+      const submission = await submissionService.getSubmissionById(submissionId);
+      if (!submission) {
+        return res.status(404).json({
+          success: false,
+          message: 'Submission not found'
+        });
+      }
+
+      // Check if the file is in the submission's attachments
+      const hasAttachment = submission.attachments?.some(attachment => 
+        attachment.filename === filename || attachment.originalFilename === filename
+      );
+      if (!hasAttachment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Attachment not found in this submission'
+        });
+      }
+
+      try {
+        // Get assignment to construct proper folder path
+        const assignment = await assignmentService.getAssignmentById(submission.assignmentId);
+        if (!assignment) {
+          return res.status(404).json({
+            success: false,
+            message: 'Related assignment not found'
+          });
+        }
+
+        // Generate folder path to construct blob name
+        const folderPath = BlobStorageService.generateFolderPath('submission', assignment.courseId, submissionId);
+        const blobName = `${folderPath}/${filename}`;
+        
+        // Generate secure download URL (valid for 1 hour)
+        const downloadUrl = await blobStorageService.generateDownloadUrl(blobName, 60);
+        
+        res.json({
+          success: true,
+          data: {
+            downloadUrl,
+            filename,
+            expiresInMinutes: 60
+          }
+        });
+      } catch (urlError) {
+        console.error('Error generating download URL:', urlError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to generate download URL'
+        });
+      }
+    } catch (error) {
+      console.error('Error in getSubmissionAttachmentDownloadUrl:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error'

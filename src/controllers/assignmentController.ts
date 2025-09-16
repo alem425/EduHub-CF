@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { AssignmentService } from '../services/assignmentService';
+import { blobStorageService, BlobStorageService } from '../services/blobStorageService';
+import { getUploadedFiles } from '../middleware/uploadMiddleware';
 import Joi from 'joi';
 
 const assignmentService = new AssignmentService();
@@ -48,12 +50,59 @@ export class AssignmentController {
     try {
       const { id: courseId } = req.params;
       
-      // Add courseId from URL params to request body for validation
-      const assignmentData = { ...req.body, courseId };
+      // Handle file uploads if any
+      const uploadedFiles = getUploadedFiles(req);
+      let attachments: string[] = [];
+
+      if (uploadedFiles.length > 0) {
+        try {
+          console.log(`📎 Processing ${uploadedFiles.length} attachment(s) for assignment...`);
+          
+          // Generate folder path for assignment attachments
+          const tempAssignmentId = 'temp-' + Date.now(); // We'll update this after assignment is created
+          const folderPath = BlobStorageService.generateFolderPath('assignment', courseId, tempAssignmentId);
+          
+          // Upload files to blob storage
+          const uploadResults = await blobStorageService.uploadFiles(uploadedFiles, folderPath);
+          
+          // Store the blob URLs as attachments
+          attachments = uploadResults.map(result => result.uploadUrl);
+          
+          console.log(`✅ Uploaded ${uploadResults.length} attachment(s) for assignment`);
+        } catch (uploadError) {
+          console.error('Error uploading assignment attachments:', uploadError);
+          return res.status(400).json({
+            success: false,
+            message: 'Failed to upload attachments',
+            error: uploadError instanceof Error ? uploadError.message : 'Unknown upload error'
+          });
+        }
+      }
+      
+      // Add courseId and attachments to request body for validation
+      const assignmentData = { 
+        ...req.body, 
+        courseId,
+        attachments: attachments.length > 0 ? attachments : undefined
+      };
       
       // Validate request body
       const { error, value } = createAssignmentSchema.validate(assignmentData);
       if (error) {
+        // If validation fails and we uploaded files, clean them up
+        if (attachments.length > 0) {
+          try {
+            const blobNames = attachments.map(url => {
+              const urlParts = url.split('/');
+              return urlParts.slice(-4).join('/'); // Get the blob name from URL
+            });
+            await blobStorageService.deleteFiles(blobNames);
+            console.log('🗑️ Cleaned up uploaded files due to validation error');
+          } catch (cleanupError) {
+            console.error('Error cleaning up files:', cleanupError);
+          }
+        }
+        
         return res.status(400).json({
           success: false,
           message: 'Validation error',
@@ -66,10 +115,14 @@ export class AssignmentController {
       
       const assignment = await assignmentService.createAssignment(value);
       
+      // If we uploaded files with a temporary ID, we should move them to the correct location
+      // For now, we'll keep them in place since the assignment is created successfully
+      
       res.status(201).json({
         success: true,
         message: 'Assignment created successfully',
-        data: assignment
+        data: assignment,
+        attachmentsUploaded: attachments.length
       });
     } catch (error: any) {
       console.error('Error in createCourseAssignment:', error);
@@ -230,6 +283,63 @@ export class AssignmentController {
       });
     } catch (error) {
       console.error('Error in getAllAssignments:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // GET /assignments/{id}/attachments/{filename}/download → Generate secure download URL
+  async getAttachmentDownloadUrl(req: Request, res: Response) {
+    try {
+      const { id: assignmentId, filename } = req.params;
+      
+      // TODO: Add authentication middleware to verify user has access to this assignment
+      
+      // Verify assignment exists
+      const assignment = await assignmentService.getAssignmentById(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Assignment not found'
+        });
+      }
+
+      // Check if the file is in the assignment's attachments
+      const hasAttachment = assignment.attachments?.some(url => url.includes(filename));
+      if (!hasAttachment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Attachment not found in this assignment'
+        });
+      }
+
+      try {
+        // Generate folder path to construct blob name
+        const folderPath = BlobStorageService.generateFolderPath('assignment', assignment.courseId, assignmentId);
+        const blobName = `${folderPath}/${filename}`;
+        
+        // Generate secure download URL (valid for 1 hour)
+        const downloadUrl = await blobStorageService.generateDownloadUrl(blobName, 60);
+        
+        res.json({
+          success: true,
+          data: {
+            downloadUrl,
+            filename,
+            expiresInMinutes: 60
+          }
+        });
+      } catch (urlError) {
+        console.error('Error generating download URL:', urlError);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to generate download URL'
+        });
+      }
+    } catch (error) {
+      console.error('Error in getAttachmentDownloadUrl:', error);
       res.status(500).json({
         success: false,
         message: 'Internal server error'

@@ -1,4 +1,5 @@
 import { CosmosClient, Database, Container } from '@azure/cosmos';
+import { blobStorageService } from '../services/blobStorageService';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -141,6 +142,16 @@ export class CosmosDBClient {
       }
 
       console.log('✅ Database and containers initialized successfully');
+      
+      // Initialize blob storage
+      try {
+        await blobStorageService.initialize();
+        console.log('✅ Blob storage initialized successfully');
+      } catch (blobError) {
+        console.error('⚠️  Blob storage initialization failed:', blobError);
+        console.log('📝 You can continue without blob storage, but file uploads will not work');
+      }
+      
     } catch (error: any) {
       console.error('❌ Error initializing database:', error.message);
       
