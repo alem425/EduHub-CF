@@ -7,6 +7,7 @@ import { cosmosClient } from './config/database';
 import courseRoutes from './routes/courseRoutes';
 import studentRoutes from './routes/studentRoutes';
 import assignmentRoutes from './routes/assignmentRoutes';
+import submissionRoutes from './routes/submissionRoutes';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 app.use('/api/courses', courseRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api', submissionRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -78,6 +80,7 @@ async function startServer() {
       console.log(`📚 Courses API: http://localhost:${PORT}/api/courses`);
       console.log(`👨‍🎓 Students API: http://localhost:${PORT}/api/students`);
       console.log(`📝 Assignments API: http://localhost:${PORT}/api/assignments`);
+      console.log(`📤 Submissions API: http://localhost:${PORT}/api/submissions`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

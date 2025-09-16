@@ -10,6 +10,7 @@ export interface AssignmentReference {
   dueDate: Date;
   assignmentType: 'homework' | 'quiz' | 'exam' | 'project' | 'essay';
   maxPoints: number;
+  submissionCount?: number;
 }
 
 export interface Course {
@@ -73,6 +74,53 @@ export interface Assignment {
   createdBy: string; // instructor ID
   attachments?: string[]; // file URLs or references
   submissionFormat: 'text' | 'file' | 'both';
+  submissionCount?: number; // Track number of submissions
+  allowLateSubmissions?: boolean;
+  allowMultipleSubmissions?: boolean;
+}
+
+export interface Submission {
+  id: string;
+  assignmentId: string;
+  courseId: string;
+  studentId: string;
+  studentName: string;
+  studentEmail: string;
+  submissionText?: string; // For text submissions
+  attachments?: SubmissionAttachment[]; // For file submissions
+  submittedAt: Date;
+  isLate: boolean;
+  status: 'submitted' | 'graded' | 'returned' | 'resubmitted';
+  submissionNumber: number; // For tracking multiple submissions (1, 2, 3, etc.)
+  grade?: number;
+  maxPoints: number; // Copy from assignment for historical reference
+  feedback?: string;
+  gradedAt?: Date;
+  gradedBy?: string; // instructor ID
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+}
+
+export interface SubmissionAttachment {
+  id: string;
+  filename: string;
+  originalFilename: string;
+  fileSize: number;
+  mimeType: string;
+  uploadUrl: string; // URL to download/view the file
+  uploadedAt: Date;
+}
+
+export interface SubmissionReference {
+  submissionId: string;
+  studentId: string;
+  studentName: string;
+  submittedAt: Date;
+  status: 'submitted' | 'graded' | 'returned' | 'resubmitted';
+  grade?: number;
+  isLate: boolean;
+  submissionNumber: number;
 }
 
 export interface User {
