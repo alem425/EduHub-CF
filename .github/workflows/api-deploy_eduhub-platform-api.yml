@@ -21,7 +21,16 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '22.x'
+          node-version: "22.x"
+
+      - name: Debug - List directory contents
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          echo "Looking for package.json files:"
+          find . -name "package.json" -type f
 
       - name: npm install, build, and test
         run: |
@@ -33,7 +42,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: |
+            .
+            !node_modules
+            !.git
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,7 +59,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-      
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -55,11 +67,10 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A34B3DDA9D9D478F84BA9DC181C9AA7E }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_AED360E8F24149B29621ECE9ECA70030 }}
 
-      - name: 'Deploy to Azure Web App'
+      - name: "Deploy to Azure Web App"
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'eduhub-platform-api'
-          slot-name: 'Production'
+          app-name: "eduhub-platform-api"
+          slot-name: "Production"
           package: .
-          
