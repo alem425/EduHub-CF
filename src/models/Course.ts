@@ -46,11 +46,17 @@ export interface Enrollment {
   lastAccessedAt?: Date;
 }
 
+export interface EnrolledCourse {
+  courseId: string;
+  courseName: string;
+  enrolledAt: Date;
+}
+
 export interface Student {
   id: string; // This is the UID
   name: string;
   email: string;
-  enrolledCourses: string[]; // Array of course IDs
+  enrolledCourses: EnrolledCourse[]; // Array of enrolled course objects with ID and name
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;

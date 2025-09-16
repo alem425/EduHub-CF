@@ -1,5 +1,5 @@
 import { cosmosClient } from '../config/database';
-import { Course, Enrollment, Student, EnrolledStudent, AssignmentReference } from '../models/Course';
+import { Course, Enrollment, Student, EnrolledStudent, AssignmentReference, EnrolledCourse } from '../models/Course';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CourseService {
@@ -104,7 +104,7 @@ export class CourseService {
       await this.coursesContainer.item(courseId, courseId).replace(course);
 
       // Create or update student document
-      await this.createOrUpdateStudent(studentId, studentName, studentEmail, courseId);
+      await this.createOrUpdateStudent(studentId, studentName, studentEmail, courseId, course.title);
 
       return enrollment;
     } catch (error) {
@@ -146,7 +146,7 @@ export class CourseService {
     }
   }
 
-  private async createOrUpdateStudent(studentId: string, studentName: string, studentEmail: string, courseId: string): Promise<Student> {
+  private async createOrUpdateStudent(studentId: string, studentName: string, studentEmail: string, courseId: string, courseName: string): Promise<Student> {
     try {
       // Try to get existing student
       let student: Student;
@@ -155,9 +155,18 @@ export class CourseService {
         if (resource) {
           student = resource;
           
-          // Add the course to their enrolled courses if not already present
-          if (!student.enrolledCourses.includes(courseId)) {
-            student.enrolledCourses.push(courseId);
+          // Check if course is already in enrolled courses
+          const isAlreadyEnrolled = student.enrolledCourses.some(course => course.courseId === courseId);
+          
+          if (!isAlreadyEnrolled) {
+            // Add the course with both ID and name
+            const enrolledCourse: EnrolledCourse = {
+              courseId,
+              courseName,
+              enrolledAt: new Date()
+            };
+            
+            student.enrolledCourses.push(enrolledCourse);
             student.updatedAt = new Date();
             await this.studentsContainer.item(studentId, studentId).replace(student);
           }
@@ -167,12 +176,18 @@ export class CourseService {
         }
       } catch (error: any) {
         if (error.code === 404) {
-          // Create new student
+          // Create new student with course info
+          const enrolledCourse: EnrolledCourse = {
+            courseId,
+            courseName,
+            enrolledAt: new Date()
+          };
+          
           student = {
             id: studentId,
             name: studentName,
             email: studentEmail,
-            enrolledCourses: [courseId],
+            enrolledCourses: [enrolledCourse],
             createdAt: new Date(),
             updatedAt: new Date(),
             isActive: true
@@ -195,7 +210,12 @@ export class CourseService {
   async getStudentById(studentId: string): Promise<Student | null> {
     try {
       const { resource } = await this.studentsContainer.item(studentId, studentId).read();
-      return resource || null;
+      if (resource) {
+        // Check if student has old format (string array) and migrate if needed
+        await this.migrateStudentEnrolledCoursesIfNeeded(resource);
+        return resource;
+      }
+      return null;
     } catch (error: any) {
       if (error.code === 404) {
         return null;
@@ -203,6 +223,56 @@ export class CourseService {
       console.error('Error fetching student:', error);
       throw new Error('Failed to fetch student');
     }
+  }
+
+  /**
+   * Migration helper for students with old enrolledCourses format (string array)
+   */
+  private async migrateStudentEnrolledCoursesIfNeeded(student: any): Promise<void> {
+    try {
+      // Check if enrolledCourses is an array of strings (old format)
+      if (student.enrolledCourses && 
+          student.enrolledCourses.length > 0 && 
+          typeof student.enrolledCourses[0] === 'string') {
+        
+        console.log(`🔄 Migrating student ${student.id} from old enrolledCourses format...`);
+        
+        const newEnrolledCourses: EnrolledCourse[] = [];
+        
+        // Convert each course ID to the new format
+        for (const courseId of student.enrolledCourses) {
+          try {
+            const course = await this.getCourseById(courseId);
+            if (course) {
+              newEnrolledCourses.push({
+                courseId: courseId,
+                courseName: course.title,
+                enrolledAt: student.createdAt || new Date() // Use student creation date as fallback
+              });
+            }
+          } catch (error) {
+            console.warn(`⚠️ Could not find course ${courseId} for student ${student.id}, skipping...`);
+          }
+        }
+        
+        // Update student with new format
+        student.enrolledCourses = newEnrolledCourses;
+        student.updatedAt = new Date();
+        await this.studentsContainer.item(student.id, student.id).replace(student);
+        
+        console.log(`✅ Successfully migrated student ${student.id} to new enrolledCourses format`);
+      }
+    } catch (error) {
+      console.error(`❌ Error migrating student ${student.id}:`, error);
+      // Don't throw error to avoid breaking student retrieval
+    }
+  }
+
+  /**
+   * Utility function to get just the course IDs from enrolled courses
+   */
+  getStudentCourseIds(student: Student): string[] {
+    return student.enrolledCourses.map(course => course.courseId);
   }
 
   async getAllStudents(): Promise<Student[]> {
