@@ -1,0 +1,11 @@
+# Frontend and client code
+frontend/
+
+# Root level utilities (keep only in backend)
+check-cosmos.js
+fix-throughput.js  
+reset-database.js
+test-api.js
+
+# Dependencies
+node_modules/
