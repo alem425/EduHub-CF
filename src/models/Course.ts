@@ -1,3 +1,9 @@
+export interface EnrolledStudent {
+  studentId: string;
+  studentName: string;
+  enrolledAt: Date;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -8,7 +14,8 @@ export interface Course {
   level: 'beginner' | 'intermediate' | 'advanced';
   duration: number; // in hours
   maxStudents: number;
-  currentEnrollments: number;
+  currentEnrollments: number; // This is the count of students currently in the class
+  enrolledStudents: EnrolledStudent[]; // Array of students with names and UIDs
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -27,6 +34,19 @@ export interface Enrollment {
   status: 'enrolled' | 'completed' | 'dropped';
   progress: number; // percentage
   lastAccessedAt?: Date;
+}
+
+export interface Student {
+  id: string; // This is the UID
+  name: string;
+  email: string;
+  enrolledCourses: string[]; // Array of course IDs
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+  academicLevel?: string;
+  major?: string;
+  profileImage?: string;
 }
 
 export interface User {

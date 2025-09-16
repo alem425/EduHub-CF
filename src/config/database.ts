@@ -9,6 +9,7 @@ export class CosmosDBClient {
   private coursesContainer: Container;
   private enrollmentsContainer: Container;
   private usersContainer: Container;
+  private studentsContainer: Container;
 
   constructor() {
     const endpoint = process.env.COSMOS_DB_ENDPOINT!;
@@ -20,6 +21,7 @@ export class CosmosDBClient {
     this.coursesContainer = this.database.container('courses');
     this.enrollmentsContainer = this.database.container('enrollments');
     this.usersContainer = this.database.container('users');
+    this.studentsContainer = this.database.container('students');
   }
 
   async initialize() {
@@ -92,6 +94,20 @@ export class CosmosDBClient {
         throw error;
       }
 
+      try {
+        await database.containers.createIfNotExists({
+          id: 'students',
+          partitionKey: '/id'
+        });
+        console.log('✅ students container ready');
+      } catch (error: any) {
+        if (error.code === 400 && error.substatus === 1028) {
+          console.log('⚠️  students container: throughput limit exceeded');
+          throw new Error('Throughput limit exceeded. Please run: node reset-database.js');
+        }
+        throw error;
+      }
+
       console.log('✅ Database and containers initialized successfully');
     } catch (error: any) {
       console.error('❌ Error initializing database:', error.message);
@@ -119,6 +135,10 @@ export class CosmosDBClient {
 
   getUsersContainer() {
     return this.usersContainer;
+  }
+
+  getStudentsContainer() {
+    return this.studentsContainer;
   }
 }
 

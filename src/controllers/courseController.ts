@@ -147,4 +147,48 @@ export class CourseController {
       });
     }
   }
+
+  // GET /students → List all students
+  async getAllStudents(req: Request, res: Response) {
+    try {
+      const students = await courseService.getAllStudents();
+      res.json({
+        success: true,
+        data: students,
+        count: students.length
+      });
+    } catch (error) {
+      console.error('Error in getAllStudents:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  // GET /students/{id} → Get student by ID
+  async getStudentById(req: Request, res: Response) {
+    try {
+      const { id: studentId } = req.params;
+      const student = await courseService.getStudentById(studentId);
+      
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: 'Student not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: student
+      });
+    } catch (error) {
+      console.error('Error in getStudentById:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
 }

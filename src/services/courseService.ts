@@ -1,10 +1,11 @@
 import { cosmosClient } from '../config/database';
-import { Course, Enrollment } from '../models/Course';
+import { Course, Enrollment, Student, EnrolledStudent } from '../models/Course';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CourseService {
   private coursesContainer = cosmosClient.getCoursesContainer();
   private enrollmentsContainer = cosmosClient.getEnrollmentsContainer();
+  private studentsContainer = cosmosClient.getStudentsContainer();
 
   async getAllCourses(): Promise<Course[]> {
     try {
@@ -33,12 +34,13 @@ export class CourseService {
     }
   }
 
-  async createCourse(courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt' | 'currentEnrollments'>): Promise<Course> {
+  async createCourse(courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt' | 'currentEnrollments' | 'enrolledStudents'>): Promise<Course> {
     try {
       const course: Course = {
         ...courseData,
         id: uuidv4(),
         currentEnrollments: 0,
+        enrolledStudents: [],
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -63,9 +65,14 @@ export class CourseService {
         throw new Error('Course is full');
       }
 
-      // Check if student is already enrolled
+      // Check if student is already enrolled (check both enrollments and course's enrolledStudents array)
       const existingEnrollment = await this.getEnrollment(courseId, studentId);
       if (existingEnrollment) {
+        throw new Error('Student already enrolled in this course');
+      }
+
+      const isAlreadyInCourse = course.enrolledStudents.some(student => student.studentId === studentId);
+      if (isAlreadyInCourse) {
         throw new Error('Student already enrolled in this course');
       }
 
@@ -83,10 +90,20 @@ export class CourseService {
 
       await this.enrollmentsContainer.items.create(enrollment);
 
-      // Update course enrollment count
+      // Add student to course's enrolledStudents array
+      const enrolledStudent: EnrolledStudent = {
+        studentId,
+        studentName,
+        enrolledAt: new Date()
+      };
+
+      course.enrolledStudents.push(enrolledStudent);
       course.currentEnrollments += 1;
       course.updatedAt = new Date();
       await this.coursesContainer.item(courseId, courseId).replace(course);
+
+      // Create or update student document
+      await this.createOrUpdateStudent(studentId, studentName, studentEmail, courseId);
 
       return enrollment;
     } catch (error) {
@@ -125,6 +142,79 @@ export class CourseService {
     } catch (error) {
       console.error('Error checking enrollment:', error);
       return null;
+    }
+  }
+
+  private async createOrUpdateStudent(studentId: string, studentName: string, studentEmail: string, courseId: string): Promise<Student> {
+    try {
+      // Try to get existing student
+      let student: Student;
+      try {
+        const { resource } = await this.studentsContainer.item(studentId, studentId).read();
+        if (resource) {
+          student = resource;
+          
+          // Add the course to their enrolled courses if not already present
+          if (!student.enrolledCourses.includes(courseId)) {
+            student.enrolledCourses.push(courseId);
+            student.updatedAt = new Date();
+            await this.studentsContainer.item(studentId, studentId).replace(student);
+          }
+        } else {
+          // Resource is null, treat as not found
+          throw { code: 404 };
+        }
+      } catch (error: any) {
+        if (error.code === 404) {
+          // Create new student
+          student = {
+            id: studentId,
+            name: studentName,
+            email: studentEmail,
+            enrolledCourses: [courseId],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isActive: true
+          };
+          
+          const { resource } = await this.studentsContainer.items.create(student);
+          student = resource!;
+        } else {
+          throw error;
+        }
+      }
+      
+      return student;
+    } catch (error) {
+      console.error('Error creating/updating student:', error);
+      throw new Error('Failed to create/update student');
+    }
+  }
+
+  async getStudentById(studentId: string): Promise<Student | null> {
+    try {
+      const { resource } = await this.studentsContainer.item(studentId, studentId).read();
+      return resource || null;
+    } catch (error: any) {
+      if (error.code === 404) {
+        return null;
+      }
+      console.error('Error fetching student:', error);
+      throw new Error('Failed to fetch student');
+    }
+  }
+
+  async getAllStudents(): Promise<Student[]> {
+    try {
+      const querySpec = {
+        query: 'SELECT * FROM c WHERE c.isActive = true ORDER BY c.name ASC'
+      };
+      
+      const { resources } = await this.studentsContainer.items.query(querySpec).fetchAll();
+      return resources;
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      throw new Error('Failed to fetch students');
     }
   }
 }

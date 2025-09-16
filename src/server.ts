@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { cosmosClient } from './config/database';
 import courseRoutes from './routes/courseRoutes';
+import studentRoutes from './routes/studentRoutes';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/courses', courseRoutes);
+app.use('/api/students', studentRoutes);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -72,6 +74,7 @@ async function startServer() {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log(`📚 Courses API: http://localhost:${PORT}/api/courses`);
+      console.log(`👨‍🎓 Students API: http://localhost:${PORT}/api/students`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
