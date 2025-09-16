@@ -43,9 +43,10 @@ jobs:
         with:
           name: node-app
           path: |
-            .
-            !node_modules
-            !.git
+            dist/
+            package*.json
+            web.config
+            node_modules/
 
   deploy:
     runs-on: ubuntu-latest
