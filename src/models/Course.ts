@@ -4,6 +4,14 @@ export interface EnrolledStudent {
   enrolledAt: Date;
 }
 
+export interface AssignmentReference {
+  assignmentId: string;
+  title: string;
+  dueDate: Date;
+  assignmentType: 'homework' | 'quiz' | 'exam' | 'project' | 'essay';
+  maxPoints: number;
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -16,6 +24,7 @@ export interface Course {
   maxStudents: number;
   currentEnrollments: number; // This is the count of students currently in the class
   enrolledStudents: EnrolledStudent[]; // Array of students with names and UIDs
+  assignments: AssignmentReference[]; // Array of assignment references
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

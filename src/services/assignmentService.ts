@@ -1,10 +1,12 @@
 import { cosmosClient } from '../config/database';
-import { Assignment } from '../models/Course';
+import { Assignment, AssignmentReference } from '../models/Course';
+import { CourseService } from './courseService';
 import { v4 as uuidv4 } from 'uuid';
 
 export class AssignmentService {
   private assignmentsContainer = cosmosClient.getAssignmentsContainer();
   private coursesContainer = cosmosClient.getCoursesContainer();
+  private courseService = new CourseService();
 
   async getCourseAssignments(courseId: string): Promise<Assignment[]> {
     try {
@@ -69,8 +71,30 @@ export class AssignmentService {
         updatedAt: new Date()
       };
 
+      // Create the assignment in the assignments container
       const { resource } = await this.assignmentsContainer.items.create(assignment);
-      return resource!;
+      const createdAssignment = resource!;
+
+      // Create assignment reference for the course
+      const assignmentReference: AssignmentReference = {
+        assignmentId: createdAssignment.id,
+        title: createdAssignment.title,
+        dueDate: createdAssignment.dueDate,
+        assignmentType: createdAssignment.assignmentType,
+        maxPoints: createdAssignment.maxPoints
+      };
+
+      // Add assignment reference to the course
+      try {
+        await this.courseService.addAssignmentToCourse(assignmentData.courseId, assignmentReference);
+        console.log(`✅ Added assignment reference to course ${assignmentData.courseId}`);
+      } catch (error) {
+        console.error('Error adding assignment to course:', error);
+        // Note: We could implement rollback here if needed, but for now we'll log the error
+        // The assignment was created successfully, but the course reference failed
+      }
+
+      return createdAssignment;
     } catch (error: any) {
       if (error.message === 'Course not found') {
         throw error;
@@ -98,7 +122,32 @@ export class AssignmentService {
         .item(assignmentId, existingAssignment.courseId)
         .replace(updatedAssignment);
       
-      return resource!;
+      const finalUpdatedAssignment = resource!;
+
+      // Check if any fields that are in the course reference were updated
+      const fieldsToCheck = ['title', 'dueDate', 'assignmentType', 'maxPoints'];
+      const shouldUpdateCourseReference = fieldsToCheck.some(field => updateData.hasOwnProperty(field));
+
+      if (shouldUpdateCourseReference) {
+        // Update assignment reference in the course
+        const assignmentReference: AssignmentReference = {
+          assignmentId: finalUpdatedAssignment.id,
+          title: finalUpdatedAssignment.title,
+          dueDate: finalUpdatedAssignment.dueDate,
+          assignmentType: finalUpdatedAssignment.assignmentType,
+          maxPoints: finalUpdatedAssignment.maxPoints
+        };
+
+        try {
+          await this.courseService.updateAssignmentInCourse(finalUpdatedAssignment.courseId, assignmentReference);
+          console.log(`✅ Updated assignment reference in course ${finalUpdatedAssignment.courseId}`);
+        } catch (error) {
+          console.error('Error updating assignment reference in course:', error);
+          // Note: Assignment was updated successfully, but course reference update failed
+        }
+      }
+      
+      return finalUpdatedAssignment;
     } catch (error: any) {
       if (error.message === 'Assignment not found') {
         throw error;
@@ -117,6 +166,15 @@ export class AssignmentService {
 
       // Soft delete by setting isActive to false
       await this.updateAssignment(assignmentId, { isActive: false });
+
+      // Remove assignment reference from the course
+      try {
+        await this.courseService.removeAssignmentFromCourse(existingAssignment.courseId, assignmentId);
+        console.log(`✅ Removed assignment reference from course ${existingAssignment.courseId}`);
+      } catch (error) {
+        console.error('Error removing assignment reference from course:', error);
+        // Note: Assignment was soft deleted successfully, but course reference removal failed
+      }
     } catch (error: any) {
       if (error.message === 'Assignment not found') {
         throw error;

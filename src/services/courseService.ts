@@ -1,5 +1,5 @@
 import { cosmosClient } from '../config/database';
-import { Course, Enrollment, Student, EnrolledStudent } from '../models/Course';
+import { Course, Enrollment, Student, EnrolledStudent, AssignmentReference } from '../models/Course';
 import { v4 as uuidv4 } from 'uuid';
 
 export class CourseService {
@@ -34,13 +34,14 @@ export class CourseService {
     }
   }
 
-  async createCourse(courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt' | 'currentEnrollments' | 'enrolledStudents'>): Promise<Course> {
+  async createCourse(courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt' | 'currentEnrollments' | 'enrolledStudents' | 'assignments'>): Promise<Course> {
     try {
       const course: Course = {
         ...courseData,
         id: uuidv4(),
         currentEnrollments: 0,
         enrolledStudents: [],
+        assignments: [],
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -215,6 +216,88 @@ export class CourseService {
     } catch (error) {
       console.error('Error fetching students:', error);
       throw new Error('Failed to fetch students');
+    }
+  }
+
+  async addAssignmentToCourse(courseId: string, assignmentReference: AssignmentReference): Promise<Course> {
+    try {
+      const course = await this.getCourseById(courseId);
+      if (!course) {
+        throw new Error('Course not found');
+      }
+
+      // Check if assignment already exists in course
+      const existingAssignment = course.assignments.find(a => a.assignmentId === assignmentReference.assignmentId);
+      if (existingAssignment) {
+        throw new Error('Assignment already exists in course');
+      }
+
+      // Add assignment reference to course
+      course.assignments.push(assignmentReference);
+      course.updatedAt = new Date();
+
+      const { resource } = await this.coursesContainer.item(courseId, courseId).replace(course);
+      return resource!;
+    } catch (error: any) {
+      if (error.message === 'Course not found' || error.message === 'Assignment already exists in course') {
+        throw error;
+      }
+      console.error('Error adding assignment to course:', error);
+      throw new Error('Failed to add assignment to course');
+    }
+  }
+
+  async removeAssignmentFromCourse(courseId: string, assignmentId: string): Promise<Course> {
+    try {
+      const course = await this.getCourseById(courseId);
+      if (!course) {
+        throw new Error('Course not found');
+      }
+
+      // Remove assignment reference from course
+      const assignmentIndex = course.assignments.findIndex(a => a.assignmentId === assignmentId);
+      if (assignmentIndex === -1) {
+        throw new Error('Assignment not found in course');
+      }
+
+      course.assignments.splice(assignmentIndex, 1);
+      course.updatedAt = new Date();
+
+      const { resource } = await this.coursesContainer.item(courseId, courseId).replace(course);
+      return resource!;
+    } catch (error: any) {
+      if (error.message === 'Course not found' || error.message === 'Assignment not found in course') {
+        throw error;
+      }
+      console.error('Error removing assignment from course:', error);
+      throw new Error('Failed to remove assignment from course');
+    }
+  }
+
+  async updateAssignmentInCourse(courseId: string, assignmentReference: AssignmentReference): Promise<Course> {
+    try {
+      const course = await this.getCourseById(courseId);
+      if (!course) {
+        throw new Error('Course not found');
+      }
+
+      // Find and update assignment reference in course
+      const assignmentIndex = course.assignments.findIndex(a => a.assignmentId === assignmentReference.assignmentId);
+      if (assignmentIndex === -1) {
+        throw new Error('Assignment not found in course');
+      }
+
+      course.assignments[assignmentIndex] = assignmentReference;
+      course.updatedAt = new Date();
+
+      const { resource } = await this.coursesContainer.item(courseId, courseId).replace(course);
+      return resource!;
+    } catch (error: any) {
+      if (error.message === 'Course not found' || error.message === 'Assignment not found in course') {
+        throw error;
+      }
+      console.error('Error updating assignment in course:', error);
+      throw new Error('Failed to update assignment in course');
     }
   }
 }
